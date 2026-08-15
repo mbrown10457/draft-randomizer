@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Draft Order Lottery</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>" />
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --border: #2d3646;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #f0a020;
+    --accent2: #58a6ff;
+    --good: #3fb950;
+    --bad: #f85149;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2436 0%, var(--bg) 60%);
+    color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { text-align: center; margin: 24px 0 20px; }
+  header .ball { font-size: 40px; }
+  h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: 0.5px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  nav { display: flex; gap: 8px; margin-bottom: 16px; }
+  nav button {
+    flex: 1; padding: 10px 0; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--panel);
+    color: var(--muted); font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  nav button.active { background: var(--panel2); color: var(--text); border-color: var(--accent); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+
+  #seed {
+    width: 100%; padding: 14px; font-size: 28px; letter-spacing: 10px;
+    text-align: center; text-transform: uppercase;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none;
+  }
+  #seed:focus { border-color: var(--accent2); }
+
+  .btn {
+    display: block; width: 100%; margin-top: 14px; padding: 14px;
+    font-size: 17px; font-weight: 700; letter-spacing: 0.5px;
+    border: none; border-radius: var(--radius); cursor: pointer;
+    background: var(--accent); color: #1a1206;
+  }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); font-weight: 600; font-size: 14px; padding: 10px; }
+
+  .error { color: var(--bad); font-size: 14px; margin-top: 10px; min-height: 1em; }
+
+  /* results */
+  ol.picks { list-style: none; margin: 0; padding: 0; }
+  ol.picks li {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 8px;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  ol.picks li.shown { opacity: 1; transform: none; }
+  ol.picks li .num {
+    font-family: ui-monospace, Menlo, monospace; font-weight: 700;
+    font-size: 15px; color: var(--accent); min-width: 64px;
+  }
+  ol.picks li .team { font-size: 17px; font-weight: 600; }
+  ol.picks li.first { border-color: var(--accent); box-shadow: 0 0 18px rgba(240,160,32,0.25); }
+  ol.picks li.first .num { color: var(--accent); }
+
+  .meta { color: var(--muted); font-size: 13px; margin-top: 12px; word-break: break-all; }
+  .meta code { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+
+  /* settings */
+  .teamrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .teamrow .idx { color: var(--muted); font-size: 13px; min-width: 22px; text-align: right; }
+  .teamrow input {
+    flex: 1; padding: 10px 12px; font-size: 15px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; outline: none;
+  }
+  .teamrow input:focus { border-color: var(--accent2); }
+  .counter { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .counter button {
+    width: 40px; height: 40px; font-size: 20px; font-weight: 700;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); cursor: pointer;
+  }
+  .counter span { font-size: 18px; font-weight: 700; min-width: 2ch; text-align: center; }
+  .saved { color: var(--good); font-size: 13px; margin-left: auto; opacity: 0; transition: opacity 0.3s; }
+  .saved.show { opacity: 1; }
+
+  details { margin-top: 4px; }
+  summary { cursor: pointer; color: var(--accent2); font-size: 14px; }
+  details p, details li { color: var(--muted); font-size: 14px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="ball">🏈</div>
+    <h1>Draft Order Lottery</h1>
+    <p>Enter the official seed to reveal the draft order.</p>
+  </header>
+
+  <nav>
+    <button id="tab-draw" class="active">Draw</button>
+    <button id="tab-settings">Settings</button>
+  </nav>
+
+  <!-- ============ DRAW TAB ============ -->
+  <section id="panel-draw">
+    <div class="card">
+      <h2>Official seed</h2>
+      <label for="seed">8 characters, letters and numbers (as recorded on video)</label>
+      <input id="seed" maxlength="8" autocomplete="off" spellcheck="false"
+             placeholder="AB12CD34" />
+      <button class="btn" id="go">Reveal draft order</button>
+      <div class="error" id="err"></div>
+    </div>
+
+    <div class="card hidden" id="results">
+      <h2>Draft order</h2>
+      <ol class="picks" id="picks"></ol>
+      <button class="btn secondary hidden" id="skip">Skip animation — show all</button>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>How results are verified</summary>
+        <p>This page is a single static file with no server and no stored state —
+           the draft order is computed entirely in your browser from the seed.
+           Anyone can open this same page, enter the same seed, and get the exact
+           same order.</p>
+        <ul>
+          <li>The seed is uppercased, so <code>ab12cd34</code> = <code>AB12CD34</code>.</li>
+          <li>Team names are sorted alphabetically before shuffling, so the order
+              names were typed in can never influence the result.</li>
+          <li>Randomness comes from the SHA-256 hash of the seed (a public,
+              universal standard), driving an unbiased Fisher–Yates shuffle.</li>
+          <li>The full algorithm is in <code>draft.js</code> — use View Source to audit it.</li>
+        </ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS TAB ============ -->
+  <section id="panel-settings" class="hidden">
+    <div class="card">
+      <h2>Teams</h2>
+      <div class="counter">
+        <button id="fewer" title="Remove a team">−</button>
+        <span id="count">10</span>
+        <button id="more" title="Add a team">+</button>
+        <label style="margin:0">teams</label>
+        <span class="saved" id="saved">Saved ✓</span>
+      </div>
+      <div id="teamlist"></div>
+      <p class="meta">Names are saved automatically in this browser. Entry order
+         doesn't matter — the draw always alphabetizes the list first. The
+         results link encodes these names so anyone can verify with the same list.</p>
+      <button class="btn secondary" id="reset">Reset to defaults</button>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { draftOrder, SEED_RE } from "./draft.js";
+
+// ======= EDIT DEFAULT TEAM NAMES HERE (Settings tab can override) =======
+const DEFAULT_TEAMS = [
+  "Team 1", "Team 2", "Team 3", "Team 4", "Team 5",
+  "Team 6", "Team 7", "Team 8", "Team 9", "Team 10",
+];
+// =========================================================================
+
+const MIN_TEAMS = 2, MAX_TEAMS = 20;
+const STORE_KEY = "draft-lottery-teams-v1";
+const $ = (id) => document.getElementById(id);
+
+// ---------- team settings (localStorage, URL override) ----------
+function loadTeams() {
+  const fromUrl = new URLSearchParams(location.search).get("teams");
+  if (fromUrl) {
+    const t = fromUrl.split("|").map((s) => s.trim()).filter(Boolean);
+    if (t.length >= MIN_TEAMS) return t;
+  }
+  try {
+    const t = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (Array.isArray(t) && t.length >= MIN_TEAMS) return t.map(String);
+  } catch {}
+  return [...DEFAULT_TEAMS];
+}
+
+let teams = loadTeams();
+
+let savedTimer;
+function saveTeams() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(teams));
+  $("saved").classList.add("show");
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => $("saved").classList.remove("show"), 1200);
+}
+
+function renderSettings() {
+  $("count").textContent = teams.length;
+  const list = $("teamlist");
+  list.innerHTML = "";
+  teams.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "teamrow";
+    const idx = document.createElement("span");
+    idx.className = "idx";
+    idx.textContent = i + 1;
+    const input = document.createElement("input");
+    input.value = name;
+    input.placeholder = `Team ${i + 1}`;
+    input.addEventListener("input", () => { teams[i] = input.value; saveTeams(); });
+    row.append(idx, input);
+    list.appendChild(row);
+  });
+}
+
+$("more").addEventListener("click", () => {
+  if (teams.length >= MAX_TEAMS) return;
+  teams.push(`Team ${teams.length + 1}`);
+  saveTeams(); renderSettings();
+});
+$("fewer").addEventListener("click", () => {
+  if (teams.length <= MIN_TEAMS) return;
+  teams.pop();
+  saveTeams(); renderSettings();
+});
+$("reset").addEventListener("click", () => {
+  teams = [...DEFAULT_TEAMS];
+  saveTeams(); renderSettings();
+});
+
+// ---------- tabs ----------
+function showTab(which) {
+  $("panel-draw").classList.toggle("hidden", which !== "draw");
+  $("panel-settings").classList.toggle("hidden", which !== "settings");
+  $("tab-draw").classList.toggle("active", which === "draw");
+  $("tab-settings").classList.toggle("active", which === "settings");
+}
+$("tab-draw").addEventListener("click", () => showTab("draw"));
+$("tab-settings").addEventListener("click", () => showTab("settings"));
+
+// ---------- draw ----------
+let revealTimers = [];
+
+async function runDraw(rawSeed) {
+  $("err").textContent = "";
+  revealTimers.forEach(clearTimeout);
+  revealTimers = [];
+
+  let result;
+  try {
+    result = await draftOrder(rawSeed, teams);
+  } catch (e) {
+    $("err").textContent = e.message;
+    $("results").classList.add("hidden");
+    return;
+  }
+
+  const { seed, teams: canonical, order } = result;
+  const picksEl = $("picks");
+  picksEl.innerHTML = "";
+  const items = order.map((team, i) => {
+    const li = document.createElement("li");
+    if (i === 0) li.classList.add("first");
+    li.innerHTML = `<span class="num">PICK ${i + 1}</span><span class="team"></span>`;
+    li.querySelector(".team").textContent = team;
+    picksEl.appendChild(li);
+    return li;
+  });
+
+  // Suspense: reveal last pick first, work up to pick 1.
+  const skipBtn = $("skip");
+  skipBtn.classList.remove("hidden");
+  const revealAll = () => {
+    revealTimers.forEach(clearTimeout);
+    items.forEach((li) => li.classList.add("shown"));
+    skipBtn.classList.add("hidden");
+  };
+  skipBtn.onclick = revealAll;
+  [...items].reverse().forEach((li, k) => {
+    revealTimers.push(setTimeout(() => {
+      li.classList.add("shown");
+      if (k === items.length - 1) skipBtn.classList.add("hidden");
+    }, 900 * (k + 1)));
+  });
+
+  const link = `${location.origin}${location.pathname}?seed=${seed}&teams=${encodeURIComponent(canonical.join("|"))}`;
+  $("meta").innerHTML =
+    `Seed: <code></code><br>Teams (alphabetized, as used): <code></code><br>` +
+    `Verification link (recomputes this result): <a style="color:var(--accent2)" href=""></a>`;
+  const codes = $("meta").querySelectorAll("code");
+  codes[0].textContent = seed;
+  codes[1].textContent = canonical.join(", ");
+  const a = $("meta").querySelector("a");
+  a.href = link;
+  a.textContent = link;
+
+  $("results").classList.remove("hidden");
+}
+
+$("go").addEventListener("click", () => runDraw($("seed").value));
+$("seed").addEventListener("keydown", (e) => { if (e.key === "Enter") runDraw($("seed").value); });
+$("seed").addEventListener("input", () => {
+  $("seed").value = $("seed").value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+});
+
+// ---------- init ----------
+renderSettings();
+const params = new URLSearchParams(location.search);
+const urlSeed = params.get("seed");
+if (urlSeed && SEED_RE.test(urlSeed)) {
+  $("seed").value = urlSeed.toUpperCase();
+  runDraw(urlSeed);
+}
+</script>
+</body>
+</html>
