@@ -92,16 +92,25 @@
     background: rgba(209,73,91,0.35); border-left: 2px solid var(--accent-soft);
   }
   .runner {
-    position: absolute; left: 0; top: 50%; font-size: 20px; z-index: 1;
-    transform: translateY(-50%) scaleX(-1); will-change: left;
+    position: absolute; left: 0; top: 50%; z-index: 1;
+    transform: translateY(-50%); will-change: left;
   }
-  .runner > span { display: inline-block; animation: bob 0.28s infinite alternate; }
-  .runner.done > span { animation: none; }
-  @keyframes bob { from { transform: translateY(-2px); } to { transform: translateY(2px); } }
+  .runner .chip {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; font-size: 15px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+    animation: bob 0.34s infinite alternate;
+  }
+  .runner.done .chip { animation: none; transform: scaleX(-1); }
+  @keyframes bob {
+    from { transform: scaleX(-1) translateY(-2px); }
+    to   { transform: scaleX(-1) translateY(2px); }
+  }
   .lane .badge {
     width: 74px; font-family: ui-monospace, Menlo, monospace;
     font-weight: 700; font-size: 12px; color: var(--accent-soft);
   }
+  ol.picks .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
 
   /* results */
   ol.picks { list-style: none; margin: 0; padding: 0; }
@@ -342,12 +351,21 @@ async function runDraw(rawSeed) {
   }
 
   const { seed, teams: canonical, order } = result;
+
+  // One distinct color per team: hues spaced evenly around the wheel,
+  // assigned by alphabetical index so they're deterministic too.
+  const colorOf = new Map(canonical.map((t, i) => {
+    const h = Math.round((i * 360) / canonical.length + 7) % 360;
+    return [t, { main: `hsl(${h}, 62%, 55%)`, soft: `hsl(${h}, 75%, 78%)` }];
+  }));
+
   const picksEl = $("picks");
   picksEl.innerHTML = "";
   const items = order.map((team, i) => {
     const li = document.createElement("li");
     if (i === 0) li.classList.add("first");
-    li.innerHTML = `<span class="num">PICK ${i + 1}</span><span class="team"></span>`;
+    li.innerHTML = `<span class="num">PICK ${i + 1}</span><span class="dot"></span><span class="team"></span>`;
+    li.querySelector(".dot").style.background = colorOf.get(team).main;
     li.querySelector(".team").textContent = team;
     picksEl.appendChild(li);
     return li;
@@ -359,19 +377,28 @@ async function runDraw(rawSeed) {
   const raceEl = $("race");
   raceEl.innerHTML = "";
   const rand = mulberry32(hash32(seed + "|race"));
-  const BASE = 3600, GAP = 650; // ms; jitter stays under GAP/2 so order holds
+  const BASE = 4500, GAP = 800; // ms; jitter stays under GAP/2 so order holds
+  const SEGS = 6;
   const lanes = canonical.map((team) => {
     const lane = document.createElement("div");
     lane.className = "lane";
-    lane.innerHTML = `<span class="lname"></span><div class="track"><span class="runner"><span>🏃</span></span></div><span class="badge"></span>`;
+    lane.innerHTML = `<span class="lname"></span><div class="track"><span class="runner"><span class="chip">🏃</span></span></div><span class="badge"></span>`;
+    const color = colorOf.get(team);
     lane.querySelector(".lname").textContent = team;
+    lane.querySelector(".lname").style.color = color.soft;
+    lane.querySelector(".chip").style.background = color.main;
+    lane.querySelector(".badge").style.color = color.soft;
     raceEl.appendChild(lane);
+    // Seeded pacing curve: monotone waypoints, so each runner surges and
+    // tires (lead changes) but only ever moves forward.
+    const incs = Array.from({ length: SEGS }, () => 0.35 + rand());
+    const total = incs.reduce((a, b) => a + b, 0);
+    const waypoints = [0];
+    for (const inc of incs) waypoints.push(waypoints[waypoints.length - 1] + inc / total);
     return {
       r: rank.get(team),
       finish: BASE + rank.get(team) * GAP + (rand() - 0.5) * 500,
-      amp: 0.05 + rand() * 0.09,
-      freq: 0.8 + rand() * 1.5,
-      phase: rand() * Math.PI * 2,
+      waypoints,
       runner: lane.querySelector(".runner"),
       badge: lane.querySelector(".badge"),
       done: false,
@@ -407,11 +434,11 @@ async function runDraw(rawSeed) {
         if (L.done) { continue; }
         if (t >= L.finish) { finishLane(L); continue; }
         const p = t / L.finish;
-        // Seeded wobble, zero at start and finish, so runners trade the
-        // lead mid-race but always cross in the predetermined order.
-        const wob = L.amp * Math.sin((t / 1000) * L.freq * 2 * Math.PI + L.phase) * Math.sin(Math.PI * p);
-        const x = Math.max(0, Math.min(0.9, p * 0.92 + wob));
-        L.runner.style.left = (x * 100).toFixed(2) + "%";
+        // Piecewise-linear interpolation over the monotone waypoints.
+        const seg = Math.min(SEGS - 1, Math.floor(p * SEGS));
+        const frac = p * SEGS - seg;
+        const f = L.waypoints[seg] + (L.waypoints[seg + 1] - L.waypoints[seg]) * frac;
+        L.runner.style.left = (f * 92).toFixed(2) + "%";
       }
       if (doneCount === lanes.length) {
         skipBtn.classList.add("hidden");
