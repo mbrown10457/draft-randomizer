@@ -173,7 +173,7 @@
   <section id="panel-draw">
     <div class="card">
       <h2>Official seed</h2>
-      <label for="seed">8 characters, letters and numbers (as recorded on video)</label>
+      <label for="seed">8 characters, letters and numbers</label>
       <input id="seed" maxlength="8" autocomplete="off" spellcheck="false"
              placeholder="AB12CD34" />
       <button class="btn" id="go">Reveal draft order</button>
@@ -477,8 +477,8 @@ renderSettings();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get("seed");
 if (urlSeed && SEED_RE.test(urlSeed)) {
+  // Prefill only — the user starts the race themselves.
   $("seed").value = urlSeed.toUpperCase();
-  runDraw(urlSeed);
 }
 </script>
 </body>
