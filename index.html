@@ -461,6 +461,9 @@ async function runDraw(rawSeed) {
   a.textContent = link;
 
   $("results").classList.remove("hidden");
+  requestAnimationFrame(() => {
+    $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 $("go").addEventListener("click", () => runDraw($("seed").value));
