@@ -96,9 +96,7 @@
     transform: translateY(-50%); will-change: left;
   }
   .runner .chip {
-    display: flex; align-items: center; justify-content: center;
-    width: 26px; height: 26px; border-radius: 50%; font-size: 15px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+    display: inline-block; font-size: 20px;
     animation: bob 0.34s infinite alternate;
   }
   .runner.done .chip { animation: none; transform: scaleX(-1); }
@@ -386,7 +384,8 @@ async function runDraw(rawSeed) {
     const color = colorOf.get(team);
     lane.querySelector(".lname").textContent = team;
     lane.querySelector(".lname").style.color = color.soft;
-    lane.querySelector(".chip").style.background = color.main;
+    lane.querySelector(".chip").style.filter =
+      `drop-shadow(0 0 3px ${color.main}) drop-shadow(0 0 9px ${color.main})`;
     lane.querySelector(".badge").style.color = color.soft;
     raceEl.appendChild(lane);
     // Seeded pacing curve: monotone waypoints, so each runner surges and
