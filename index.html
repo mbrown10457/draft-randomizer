@@ -58,6 +58,10 @@
     border: 1px solid var(--border); border-radius: var(--radius); outline: none;
   }
   #seed:focus { border-color: var(--accent2); }
+  #seed::placeholder {
+    font: 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: normal; text-transform: none; color: var(--muted);
+  }
 
   .btn {
     display: block; width: 100%; margin-top: 14px; padding: 14px;
@@ -172,10 +176,8 @@
   <!-- ============ DRAW TAB ============ -->
   <section id="panel-draw">
     <div class="card">
-      <h2>Official seed</h2>
-      <label for="seed">8 characters, letters and numbers</label>
       <input id="seed" maxlength="8" autocomplete="off" spellcheck="false"
-             placeholder="AB12CD34" />
+             placeholder="Official seed — 8 letters &amp; numbers" />
       <button class="btn" id="go">Reveal draft order</button>
       <div class="error" id="err"></div>
     </div>
