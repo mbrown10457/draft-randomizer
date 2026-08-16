@@ -50,7 +50,7 @@
   label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 
   #seed {
-    width: 100%; padding: 14px; font-size: 28px; letter-spacing: 10px;
+    width: 100%; padding: 14px; font-size: 22px; letter-spacing: 4px;
     text-align: center; text-transform: uppercase;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     background: var(--bg); color: var(--text);
@@ -173,8 +173,8 @@
   <!-- ============ DRAW TAB ============ -->
   <section id="panel-draw">
     <div class="card">
-      <input id="seed" maxlength="8" autocomplete="off" spellcheck="false"
-             placeholder="Official seed — 8 alphanumeric characters" />
+      <input id="seed" autocomplete="off" spellcheck="false"
+             placeholder="Official seed — any text" />
       <button class="btn" id="go">Reveal draft order</button>
       <div class="error" id="err"></div>
     </div>
@@ -196,7 +196,8 @@
            Anyone can open this same page, enter the same seed, and get the exact
            same order.</p>
         <ul>
-          <li>The seed is uppercased, so <code>ab12cd34</code> = <code>AB12CD34</code>.</li>
+          <li>The seed is any text; it is trimmed and uppercased, so
+              <code>ab12cd34</code> = <code>AB12CD34</code>.</li>
           <li>Team names are sorted alphabetically before shuffling, so the order
               names were typed in can never influence the result.</li>
           <li>Randomness comes from the SHA-256 hash of the seed (a public,
@@ -228,7 +229,7 @@
 </div>
 
 <script type="module">
-import { draftOrder, SEED_RE } from "./draft.js";
+import { draftOrder } from "./draft.js";
 
 // ======= EDIT DEFAULT TEAM NAMES HERE (Settings tab can override) =======
 const DEFAULT_TEAMS = [
@@ -467,7 +468,7 @@ async function runDraw(rawSeed) {
     raceRaf = requestAnimationFrame(step);
   }
 
-  const link = `${location.origin}${location.pathname}?seed=${seed}&teams=${encodeURIComponent(canonical.join("|"))}`;
+  const link = `${location.origin}${location.pathname}?seed=${encodeURIComponent(seed)}&teams=${encodeURIComponent(canonical.join("|"))}`;
   $("meta").innerHTML =
     `Seed: <code></code><br>Teams (alphabetized, as used): <code></code><br>` +
     `Verification link (recomputes this result): <a style="color:var(--accent2)" href=""></a>`;
@@ -485,18 +486,15 @@ async function runDraw(rawSeed) {
 
 $("go").addEventListener("click", () => runDraw($("seed").value));
 $("seed").addEventListener("keydown", (e) => { if (e.key === "Enter") runDraw($("seed").value); });
-$("seed").addEventListener("input", () => {
-  $("seed").value = $("seed").value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-});
 
 // ---------- init ----------
 renderSettings();
 renderIdleField();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get("seed");
-if (urlSeed && SEED_RE.test(urlSeed)) {
+if (urlSeed && urlSeed.trim()) {
   // Prefill only — the user starts the race themselves.
-  $("seed").value = urlSeed.toUpperCase();
+  $("seed").value = urlSeed;
 }
 </script>
 </body>

@@ -2,7 +2,7 @@
 
 A verifiable fantasy-football draft-order randomizer. Static site, no server,
 no dependencies, no build step — the entire result is computed in the browser
-from an 8-character alphanumeric seed.
+from a seed (any non-empty text, case-insensitive, trimmed).
 
 ## How the draw works
 

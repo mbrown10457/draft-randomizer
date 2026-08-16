@@ -33,12 +33,25 @@ check("different seed gives different order", JSON.stringify(a.order) !== JSON.s
 // order is a permutation of the teams
 check("result is a permutation", [...a.order].sort().join("|") === [...TEAMS].sort().join("|"));
 
-// seed validation
-for (const bad of ["", "ABC", "ABCDEFGHI", "AB12CD3!", "AB 12CD4"]) {
+// seed validation: only empty/whitespace-only seeds are rejected
+for (const bad of ["", "   ", "\t\n"]) {
   let threw = false;
   try { normalizeSeed(bad); } catch { threw = true; }
-  check(`rejects bad seed ${JSON.stringify(bad)}`, threw);
+  check(`rejects empty seed ${JSON.stringify(bad)}`, threw);
 }
+// any non-empty string is a valid seed now
+for (const good of ["A", "GO HAWKS 2026!", "🏈🏈🏈", "x".repeat(500)]) {
+  let threw = false;
+  try { await draftOrder(good, TEAMS); } catch { threw = true; }
+  check(`accepts seed ${JSON.stringify(good.slice(0, 20))}`, !threw);
+}
+// trim + case normalization
+const t1 = await draftOrder("  go hawks  ", TEAMS);
+const t2 = await draftOrder("GO HAWKS", TEAMS);
+check("trimmed/uppercased seeds are equivalent", JSON.stringify(t1.order) === JSON.stringify(t2.order));
+// interior spacing is significant
+const t3 = await draftOrder("GOHAWKS", TEAMS);
+check("interior spaces are significant", JSON.stringify(t2.order) !== JSON.stringify(t3.order));
 
 // duplicate team names rejected (case-insensitive)
 let dupThrew = false;
@@ -59,8 +72,9 @@ check(`pick-1 distribution roughly uniform over ${N} seeds (worst dev ${worst}, 
   worst < expected * 0.35);
 console.log("   pick-1 counts:", Object.values(firsts).join(", "));
 
-// stable published vector: if the algorithm ever changes, this fails loudly
+// stable published vector: if the algorithm ever changes, this fails loudly.
+// Old 8-char seeds MUST keep producing the same order they always did.
 const vector = await draftOrder("TEST1234", ["A", "B", "C", "D"]);
-console.log("   TEST1234 over A,B,C,D →", vector.order.join(", "));
+check("TEST1234 vector unchanged (B, C, D, A)", vector.order.join(", ") === "B, C, D, A");
 
 process.exit(failures ? 1 : 0);

@@ -3,8 +3,9 @@
 // always produce the same order, in any browser, forever.
 //
 // How it works, step by step:
-//   1. The seed must be exactly 8 alphanumeric characters. It is uppercased,
-//      so "ab12cd34" and "AB12CD34" are the same seed.
+//   1. The seed is any non-empty text. It is trimmed and uppercased, so
+//      "ab12cd34" and " AB12CD34 " are the same seed. (Interior spaces
+//      and punctuation are significant.)
 //   2. Team names are trimmed and sorted alphabetically (case-insensitive,
 //      by code point). Because of this, the ORDER the names were entered in
 //      can never affect the result — only the set of names matters.
@@ -19,14 +20,10 @@
 
 const subtle = globalThis.crypto.subtle;
 
-export const SEED_RE = /^[A-Za-z0-9]{8}$/;
-
 export function normalizeSeed(raw) {
-  const s = String(raw).trim();
-  if (!SEED_RE.test(s)) {
-    throw new Error("Seed must be exactly 8 letters/digits (A-Z, 0-9).");
-  }
-  return s.toUpperCase();
+  const s = String(raw).trim().toUpperCase();
+  if (!s) throw new Error("Seed cannot be empty.");
+  return s;
 }
 
 export function canonicalTeams(rawList) {
