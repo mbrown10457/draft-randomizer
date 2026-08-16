@@ -182,7 +182,7 @@
       <div class="error" id="err"></div>
     </div>
 
-    <div class="card hidden" id="results">
+    <div class="card" id="results">
       <h2>The race for pick 1</h2>
       <p class="tagline">First across the goal line drafts first.</p>
       <div id="race"></div>
@@ -263,6 +263,7 @@ let teams = loadTeams();
 let savedTimer;
 function saveTeams() {
   localStorage.setItem(STORE_KEY, JSON.stringify(teams));
+  renderIdleField();
   $("saved").classList.add("show");
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => $("saved").classList.remove("show"), 1200);
@@ -337,6 +338,41 @@ function mulberry32(a) {
   };
 }
 
+// One lane per team with a distinct hue (spaced around the color wheel,
+// assigned by position in the given list so colors are deterministic).
+function buildLanes(names) {
+  const raceEl = $("race");
+  raceEl.innerHTML = "";
+  return names.map((team, i) => {
+    const h = Math.round((i * 360) / names.length + 7) % 360;
+    const main = `hsl(${h}, 62%, 55%)`;
+    const soft = `hsl(${h}, 75%, 78%)`;
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    lane.innerHTML = `<span class="lname"></span><div class="track"><span class="runner"><span class="chip">🏃</span></span></div><span class="badge"></span>`;
+    lane.querySelector(".lname").textContent = team;
+    lane.querySelector(".lname").style.color = soft;
+    lane.querySelector(".chip").style.filter =
+      `drop-shadow(0 0 3px ${main}) drop-shadow(0 0 9px ${main})`;
+    raceEl.appendChild(lane);
+    return { team, main, soft, runner: lane.querySelector(".runner"), badge: lane.querySelector(".badge") };
+  });
+}
+
+// The field at rest: everyone on the start line. Shown before any seed is
+// entered and refreshed live as settings change.
+function renderIdleField() {
+  if (raceRaf !== null) { cancelAnimationFrame(raceRaf); raceRaf = null; }
+  $("picks").innerHTML = "";
+  $("meta").textContent = "";
+  $("skip").classList.add("hidden");
+  const names = teams.map((t) => t.trim()).filter(Boolean).sort((a, b) => {
+    const x = a.toLowerCase(), y = b.toLowerCase();
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
+  buildLanes(names);
+}
+
 async function runDraw(rawSeed) {
   $("err").textContent = "";
   if (raceRaf !== null) { cancelAnimationFrame(raceRaf); raceRaf = null; }
@@ -346,18 +382,13 @@ async function runDraw(rawSeed) {
     result = await draftOrder(rawSeed, teams);
   } catch (e) {
     $("err").textContent = e.message;
-    $("results").classList.add("hidden");
+    renderIdleField();
     return;
   }
 
   const { seed, teams: canonical, order } = result;
-
-  // One distinct color per team: hues spaced evenly around the wheel,
-  // assigned by alphabetical index so they're deterministic too.
-  const colorOf = new Map(canonical.map((t, i) => {
-    const h = Math.round((i * 360) / canonical.length + 7) % 360;
-    return [t, { main: `hsl(${h}, 62%, 55%)`, soft: `hsl(${h}, 75%, 78%)` }];
-  }));
+  const laneRecs = buildLanes(canonical);
+  const colorOf = new Map(laneRecs.map((L) => [L.team, L]));
 
   const picksEl = $("picks");
   picksEl.innerHTML = "";
@@ -371,25 +402,14 @@ async function runDraw(rawSeed) {
     return li;
   });
 
-  // Build one lane per team, in alphabetical order so nothing is spoiled.
   // Each runner's finish time comes from its pick: pick 1 finishes first.
+  // Lanes stay in alphabetical order so nothing is spoiled.
   const rank = new Map(order.map((t, i) => [t, i]));
-  const raceEl = $("race");
-  raceEl.innerHTML = "";
   const rand = mulberry32(hash32(seed + "|race"));
   const BASE = 4500, GAP = 800; // ms; jitter stays under GAP/2 so order holds
   const SEGS = 6;
-  const lanes = canonical.map((team) => {
-    const lane = document.createElement("div");
-    lane.className = "lane";
-    lane.innerHTML = `<span class="lname"></span><div class="track"><span class="runner"><span class="chip">🏃</span></span></div><span class="badge"></span>`;
-    const color = colorOf.get(team);
-    lane.querySelector(".lname").textContent = team;
-    lane.querySelector(".lname").style.color = color.soft;
-    lane.querySelector(".chip").style.filter =
-      `drop-shadow(0 0 3px ${color.main}) drop-shadow(0 0 9px ${color.main})`;
-    lane.querySelector(".badge").style.color = color.soft;
-    raceEl.appendChild(lane);
+  const lanes = laneRecs.map((rec) => {
+    rec.badge.style.color = rec.soft;
     // Seeded pacing curve: monotone waypoints, so each runner surges and
     // tires (lead changes) but only ever moves forward.
     const incs = Array.from({ length: SEGS }, () => 0.35 + rand());
@@ -397,11 +417,10 @@ async function runDraw(rawSeed) {
     const waypoints = [0];
     for (const inc of incs) waypoints.push(waypoints[waypoints.length - 1] + inc / total);
     return {
-      r: rank.get(team),
-      finish: BASE + rank.get(team) * GAP + (rand() - 0.5) * 500,
+      ...rec,
+      r: rank.get(rec.team),
+      finish: BASE + rank.get(rec.team) * GAP + (rand() - 0.5) * 500,
       waypoints,
-      runner: lane.querySelector(".runner"),
-      badge: lane.querySelector(".badge"),
       done: false,
     };
   });
@@ -462,7 +481,6 @@ async function runDraw(rawSeed) {
   a.href = link;
   a.textContent = link;
 
-  $("results").classList.remove("hidden");
   requestAnimationFrame(() => {
     $("results").scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -476,6 +494,7 @@ $("seed").addEventListener("input", () => {
 
 // ---------- init ----------
 renderSettings();
+renderIdleField();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get("seed");
 if (urlSeed && SEED_RE.test(urlSeed)) {
